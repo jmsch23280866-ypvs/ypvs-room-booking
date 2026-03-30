@@ -1,0 +1,8 @@
+經過二次編譯:
+https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Fcalendar.google.com%2Fcalendar%2Fu%2F0%2Fr%2Feventedit%3Ftext%3D%25E3%2580%2590%25E8%2599%2595%25E5%25AE%25A4%25E5%2596%25AE%25E4%25BD%258D%25E3%2580%2591%25E6%25B4%25BB%25E5%258B%2595%25E5%2590%258D%25E7%25A8%258B%26add%3Dc_1883f40drcs8kh6lkvl36oh7qlhq6%2540resource.calendar.google.com&flowName=GlifWebSignIn
+
+經過一次編譯:
+https://accounts.google.com/v3/signin/identifier?continue=https://calendar.google.com/calendar/u/0/r/eventedit?text=%E3%80%90%E8%99%95%E5%AE%A4%E5%96%AE%E4%BD%8D%E3%80%91%E6%B4%BB%E5%8B%95%E5%90%8D%E7%A8%8B&add=c_1883f40drcs8kh6lkvl36oh7qlhq6%40resource.calendar.google.com&flowName=GlifWebSignIn
+
+原始網址:
+https://accounts.google.com/v3/signin/identifier?continue=https://calendar.google.com/calendar/u/0/r/eventedit?text=【處室單位】活動名程&add=c_1883f40drcs8kh6lkvl36oh7qlhq6@resource.calendar.google.com&flowName=GlifWebSignIn

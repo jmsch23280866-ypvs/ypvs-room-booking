@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>永平工商會議室快速預約</title>
+    <link rel="icon" type="image/png" href="https://www.ypvs.tyc.edu.tw/wp-content/themes/ypvs2502/images/icon/section_icon_12.png">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1 class="title">永平工商會議室快速預約</h1>
+            <p class="subtitle">快速建立包含會議室邀請的 Google 日曆活動連結</p>
+        </header>
+
+        <main class="main">
+            <div class="form-container">
+                <div class="form-group">
+                    <label for="department" class="label">處室單位</label>
+                    <input type="text" id="department" class="input" placeholder="例如：人事室、教務處、學務處">
+                </div>
+
+                <div class="form-group">
+                    <label for="eventName" class="label">活動名稱</label>
+                    <input type="text" id="eventName" class="input" placeholder="請輸入活動名稱">
+                </div>
+
+                <div class="form-group">
+                    <label for="roomSelect" class="label">選擇會議室</label>
+                    <select id="roomSelect" class="select">
+                        <option value="">請選擇會議室</option>
+                        <option value="多功能會議室">多功能會議室</option>
+                        <option value="明德堂大樓-3樓-大禮堂">明德堂大樓-3樓-大禮堂</option>
+                        <option value="明德堂大樓-6樓-校史館">明德堂大樓-6樓-校史館</option>
+                        <option value="明德堂大樓-6樓-圖書館">明德堂大樓-6樓-圖書館</option>
+                        <option value="餐飲觀光大樓-4樓-階梯會議室">餐飲觀光大樓-4樓-階梯會議室</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="eventDate" class="label">預約日期</label>
+                    <input type="date" id="eventDate" class="input" autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="startTime" class="label">開始時間</label>
+                    <input type="text" id="startTime" class="input" placeholder="選擇時間" autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="endTime" class="label">結束時間</label>
+                    <input type="text" id="endTime" class="input" placeholder="選擇時間" autocomplete="off">
+                </div>
+
+                <div class="button-group">
+                    <button id="generateBtn" class="btn btn-primary">產生日曆連結</button>
+                </div>
+            </div>
+
+            <div class="instructions">
+                <h3>使用說明</h3>
+                <ol>
+                    <li>填寫處室單位（如：教務處）</li>
+                    <li>填寫活動名稱（如：會議）</li>
+                    <li>選擇會議室</li>
+                    <li>選擇預約日期和時間</li>
+                    <li>點擊「產生日曆連結」</li>
+                    <li>系統會自動檢查會議室時間衝突</li>
+                    <li>確認無衝突後，系統會自動複製連結並開啟 Google 帳戶選擇器，需要登入後才能建立日曆活動</li>
+                    <li>活動標題將自動格式化為「【處室單位】活動名稱」的格式</li>
+                </ol>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2025 永平工商 資訊組. 會議室快速預約系統</p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh-tw.js"></script>
+    <script src="script.js"></script>
+</body>
+</html> 
