@@ -17,7 +17,7 @@
 - `styles.css`：自訂美觀樣式
 - `會議室對應公開網址.txt`：各會議室的 Google 日曆公開網址與 iCal 連結
 - `會議室清單.txt`：各會議室名稱與對應 Google Calendar 資源郵件
-- `網址編譯.txt`：Google 日曆活動連結編譯過程紀錄
+- `網址編譯範例.txt`：Google 日曆活動連結編譯過程紀錄
 
 ## 使用說明
 1. 開啟 `index.html`
