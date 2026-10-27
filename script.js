@@ -693,6 +693,55 @@ function formatDateForGoogleUTC(date, time) {
     return localDate.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
 }
 
+// CORS 代理列表（依優先順序嘗試）
+const CORS_PROXIES = [
+    {
+        name: 'allorigins',
+        buildUrl: (targetUrl) => `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
+    },
+    {
+        name: 'corsproxy',
+        buildUrl: (targetUrl) => `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
+    },
+    {
+        name: 'codetabs',
+        buildUrl: (targetUrl) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`
+    }
+];
+
+// 使用多重 CORS 代理 fallback 機制取得遠端資源
+async function fetchWithProxyFallback(targetUrl) {
+    const errors = [];
+    for (const proxy of CORS_PROXIES) {
+        try {
+            const url = proxy.buildUrl(targetUrl);
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 10000); // 10 秒逾時
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: { 'Accept': 'text/calendar,text/plain,*/*' },
+                signal: controller.signal
+            });
+            clearTimeout(timeout);
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status} ${response.statusText}`);
+            }
+            const text = await response.text();
+            // 驗證回傳的確實是 iCal 資料
+            if (!text.includes('BEGIN:VCALENDAR')) {
+                throw new Error('回傳內容非有效的 iCal 格式');
+            }
+            console.log(`[衝突檢查] 使用 ${proxy.name} 代理成功`);
+            return text;
+        } catch (err) {
+            const errMsg = err.name === 'AbortError' ? '連線逾時' : err.message;
+            console.warn(`[衝突檢查] ${proxy.name} 代理失敗: ${errMsg}`);
+            errors.push(`${proxy.name}: ${errMsg}`);
+        }
+    }
+    throw new Error(`所有 CORS 代理均無法取得資料。\n${errors.join('\n')}`);
+}
+
 // 檢查會議室衝突
 async function checkRoomConflict(room, date, startTime, endTime) {
     try {
@@ -707,15 +756,8 @@ async function checkRoomConflict(room, date, startTime, endTime) {
         // 直接用 UTC 時間做比對
         const startDateTime = new Date(localStart.getTime());
         const endDateTime = new Date(localEnd.getTime());
-        // 取得 iCal（加上 corsproxy.io 代理）
-        const proxy = 'https://corsproxy.io/?';
-        const url = proxy + encodeURIComponent(icalUrl);
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: { 'Accept': 'text/calendar,text/plain,*/*' }
-        });
-        if (!response.ok) throw new Error(`無法獲取會議室日曆數據: ${response.status} ${response.statusText}`);
-        const icalData = await response.text();
+        // 透過多重 CORS 代理 fallback 取得 iCal 資料
+        const icalData = await fetchWithProxyFallback(icalUrl);
         const conflicts = parseICalForConflicts(icalData, startDateTime, endDateTime);
         if (conflicts.length > 0) {
             const conflictInfo = conflicts.map(c => {
