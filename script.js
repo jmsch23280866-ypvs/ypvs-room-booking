@@ -693,7 +693,7 @@ function formatDateForGoogleUTC(date, time) {
     return localDate.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
 }
 
-// CORS 代理列表（依優先順序嘗試）
+// CORS 代理列表（全部併行查詢）
 const CORS_PROXIES = [
     {
         name: 'allorigins',
@@ -709,40 +709,85 @@ const CORS_PROXIES = [
     }
 ];
 
-// 使用多重 CORS 代理 fallback 機制取得遠端資源
-async function fetchWithProxyFallback(targetUrl) {
-    const errors = [];
-    for (const proxy of CORS_PROXIES) {
-        try {
-            const url = proxy.buildUrl(targetUrl);
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 10000); // 10 秒逾時
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: { 'Accept': 'text/calendar,text/plain,*/*' },
-                signal: controller.signal
-            });
-            clearTimeout(timeout);
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status} ${response.statusText}`);
-            }
-            const text = await response.text();
-            // 驗證回傳的確實是 iCal 資料
-            if (!text.includes('BEGIN:VCALENDAR')) {
-                throw new Error('回傳內容非有效的 iCal 格式');
-            }
-            console.log(`[衝突檢查] 使用 ${proxy.name} 代理成功`);
-            return text;
-        } catch (err) {
-            const errMsg = err.name === 'AbortError' ? '連線逾時' : err.message;
-            console.warn(`[衝突檢查] ${proxy.name} 代理失敗: ${errMsg}`);
-            errors.push(`${proxy.name}: ${errMsg}`);
+// 透過單一代理取得 iCal 資料（附逾時控制）
+async function fetchViaProxy(proxy, targetUrl) {
+    const url = proxy.buildUrl(targetUrl);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000); // 10 秒逾時
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Accept': 'text/calendar,text/plain,*/*' },
+            signal: controller.signal
+        });
+        clearTimeout(timeout);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status} ${response.statusText}`);
         }
+        const text = await response.text();
+        // 驗證回傳的確實是 iCal 資料
+        if (!text.includes('BEGIN:VCALENDAR')) {
+            throw new Error('回傳內容非有效的 iCal 格式');
+        }
+        console.log(`[衝突檢查] ${proxy.name} 代理成功取得 iCal 資料`);
+        return { proxy: proxy.name, data: text };
+    } catch (err) {
+        clearTimeout(timeout);
+        const errMsg = err.name === 'AbortError' ? '連線逾時' : err.message;
+        console.warn(`[衝突檢查] ${proxy.name} 代理失敗: ${errMsg}`);
+        throw new Error(`${proxy.name}: ${errMsg}`);
     }
-    throw new Error(`所有 CORS 代理均無法取得資料。\n${errors.join('\n')}`);
 }
 
-// 檢查會議室衝突
+// 併行查詢所有 CORS 代理，檢查會議室衝突
+// 回傳: { hasConflict: boolean, conflicts: Array, allFailed: boolean }
+async function checkRoomConflictParallel(icalUrl, startDateTime, endDateTime) {
+    // 所有代理併行發送請求
+    const promises = CORS_PROXIES.map(proxy =>
+        fetchViaProxy(proxy, icalUrl).then(result => {
+            // 成功取得資料後立即解析衝突
+            const conflicts = parseICalForConflicts(result.data, startDateTime, endDateTime);
+            return { proxy: result.proxy, conflicts, success: true };
+        }).catch(err => {
+            return { proxy: err.message, conflicts: [], success: false, error: err.message };
+        })
+    );
+
+    const results = await Promise.all(promises);
+
+    // 統計結果
+    const successResults = results.filter(r => r.success);
+    const conflictResults = successResults.filter(r => r.conflicts.length > 0);
+
+    console.log(`[衝突檢查] 結果: ${successResults.length}/${results.length} 代理成功, ${conflictResults.length} 個發現衝突`);
+
+    // 所有代理都失敗
+    if (successResults.length === 0) {
+        return { hasConflict: false, conflicts: [], allFailed: true };
+    }
+
+    // 只要有任何一個代理發現衝突，就判定為衝突
+    if (conflictResults.length > 0) {
+        // 合併所有衝突（去重）
+        const allConflicts = [];
+        const seen = new Set();
+        for (const r of conflictResults) {
+            for (const c of r.conflicts) {
+                const key = `${c.start?.getTime()}-${c.end?.getTime()}-${c.summary}`;
+                if (!seen.has(key)) {
+                    seen.add(key);
+                    allConflicts.push(c);
+                }
+            }
+        }
+        return { hasConflict: true, conflicts: allConflicts, allFailed: false };
+    }
+
+    // 至少有一個代理成功且沒有衝突
+    return { hasConflict: false, conflicts: [], allFailed: false };
+}
+
+// 檢查會議室衝突（主入口）
 async function checkRoomConflict(room, date, startTime, endTime) {
     try {
         const roomEmail = ROOM_EMAILS[room];
@@ -756,11 +801,17 @@ async function checkRoomConflict(room, date, startTime, endTime) {
         // 直接用 UTC 時間做比對
         const startDateTime = new Date(localStart.getTime());
         const endDateTime = new Date(localEnd.getTime());
-        // 透過多重 CORS 代理 fallback 取得 iCal 資料
-        const icalData = await fetchWithProxyFallback(icalUrl);
-        const conflicts = parseICalForConflicts(icalData, startDateTime, endDateTime);
-        if (conflicts.length > 0) {
-            const conflictInfo = conflicts.map(c => {
+        // 併行查詢所有 CORS 代理
+        const result = await checkRoomConflictParallel(icalUrl, startDateTime, endDateTime);
+
+        if (result.allFailed) {
+            // 所有代理都失敗 → 阻止跳轉（安全起見）
+            showNotification('⚠️ 所有代理均無法連線，無法確認會議室可用性，請稍後再試或手動確認', 'error');
+            return true; // 回傳 true 以阻止跳轉
+        }
+
+        if (result.hasConflict) {
+            const conflictInfo = result.conflicts.map(c => {
                 const startStr = c.start ? c.start.toLocaleString('zh-TW') : '未知時間';
                 const endStr = c.end ? c.end.toLocaleString('zh-TW') : '未知時間';
                 return `${c.summary || '未命名事件'} (${startStr} - ${endStr})`;
@@ -768,12 +819,14 @@ async function checkRoomConflict(room, date, startTime, endTime) {
             showNotification(`檢測到時間衝突：${conflictInfo}`, 'error');
             return true;
         }
-        showNotification('會議室時間可用，無衝突', 'success');
+
+        showNotification('會議室時間可用，無衝突 ✓', 'success');
         return false;
     } catch (error) {
         console.error('檢查會議室衝突時發生錯誤:', error);
-        showNotification('無法自動檢查衝突，請手動確認會議室可用性', 'error');
-        return false;
+        // 發生未預期錯誤 → 阻止跳轉（安全起見）
+        showNotification('⚠️ 檢查衝突時發生錯誤，請稍後再試或手動確認會議室可用性', 'error');
+        return true; // 回傳 true 以阻止跳轉
     }
 }
 
