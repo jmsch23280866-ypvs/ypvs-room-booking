@@ -491,19 +491,11 @@ function formatDateForGoogleUTC(date, time) {
     return localDate.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
 }
 
-// CORS 代理列表（全部併行查詢）
+// CORS 代理列表（併行查詢）
 const CORS_PROXIES = [
     {
-        name: 'allorigins',
-        buildUrl: (targetUrl) => `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`
-    },
-    {
-        name: 'corsproxy',
-        buildUrl: (targetUrl) => `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`
-    },
-    {
-        name: 'codetabs',
-        buildUrl: (targetUrl) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`
+        name: 'gas-proxy',
+        buildUrl: (targetUrl) => `https://script.google.com/macros/s/AKfycbyu3hZvE_-V5fvuBLYEogMCs2kboFRObzplU55UCQtWb-BBDgWELLC4cjr18wzHVm4l/exec?url=${encodeURIComponent(targetUrl)}`
     }
 ];
 
