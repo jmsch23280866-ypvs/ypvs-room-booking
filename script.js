@@ -27,9 +27,7 @@ const elements = {
     generateBtn: document.getElementById('generateBtn')
 };
 
-// Flatpickr 實例
-let startTimePicker = null;
-let endTimePicker = null;
+// 日期選取器實例
 let datePicker = null;
 
 // 時間限制常數
@@ -126,17 +124,13 @@ function onDateChange(e) {
     }
     // 日期變更後依據是否為今日，調整時間最小值
     const minTimeTodayAware = getMinTimeForSelectedDate();
-    if (startTimePicker) startTimePicker.set('minTime', minTimeTodayAware);
-    if (endTimePicker) endTimePicker.set('minTime', minTimeTodayAware);
 
     // 若既有時間早於最小允許值，則自動上調到最小值
     if (elements.startTime.value && compareTime(elements.startTime.value, minTimeTodayAware) < 0) {
         elements.startTime.value = minTimeTodayAware;
-        startTimePicker && startTimePicker.setDate(minTimeTodayAware, true, 'H:i');
     }
     if (elements.endTime.value && compareTime(elements.endTime.value, minTimeTodayAware) < 0) {
         elements.endTime.value = minTimeTodayAware;
-        endTimePicker && endTimePicker.setDate(minTimeTodayAware, true, 'H:i');
     }
     validateForm();
 }
@@ -169,14 +163,6 @@ function onTimeChange(e) {
     if (elements.eventDate.value && compareTime(input.value, minTime) < 0) {
         input.value = minTime;
     }
-    // 同步 Flatpickr 顯示
-    if (input === elements.startTime && typeof startTimePicker?.setDate === 'function') {
-        startTimePicker.set('minTime', minTime);
-        startTimePicker.setDate(input.value, true, 'H:i');
-    } else if (input === elements.endTime && typeof endTimePicker?.setDate === 'function') {
-        endTimePicker.set('minTime', minTime);
-        endTimePicker.setDate(input.value, true, 'H:i');
-    }
     validateForm();
 }
 
@@ -202,14 +188,6 @@ const handleTimeInput = debounce((input) => {
         const minTime = getMinTimeForSelectedDate();
         if (elements.eventDate.value && compareTime(input.value, minTime) < 0) {
             input.value = minTime;
-        }
-        // 同步 Flatpickr 但不觸發 onChange 的副作用
-        if (input === elements.startTime && startTimePicker) {
-            startTimePicker.set('minTime', minTime);
-            startTimePicker.setDate(input.value, false, 'H:i');
-        } else if (input === elements.endTime && endTimePicker) {
-            endTimePicker.set('minTime', minTime);
-            endTimePicker.setDate(input.value, false, 'H:i');
         }
         // 輕量驗證，不彈出提示
         validateForm();
@@ -423,74 +401,64 @@ function compareTime(a, b) {
     return av === bv ? 0 : (av < bv ? -1 : 1);
 }
 
-// 初始化 Flatpickr 時間選取器（24小時制、5 分鐘刻度、06:00–22:00）
+// 初始化 ClockPicker 時間選取器（24小時制，採用 https://weareoutman.github.io/clockpicker/）
 function initializeTimePickers() {
-    if (typeof flatpickr !== 'function') return;
-    const commonOptions = {
-        enableTime: true,
-        noCalendar: true,
-        time_24hr: true,
-        minuteIncrement: 5,
-        wheelInput: false,
-        allowInput: true,
-        dateFormat: 'H:i',
-        locale: (window.flatpickr && window.flatpickr.l10ns && window.flatpickr.l10ns.zh_tw) ? window.flatpickr.l10ns.zh_tw : undefined
+    if (typeof jQuery === 'undefined' || typeof jQuery.fn.clockpicker === 'undefined') {
+        console.warn('ClockPicker 或 jQuery 尚未載入');
+        return;
+    }
+
+    const clockOptions = {
+        placement: 'bottom',
+        align: 'left',
+        autoclose: true,
+        donetext: '確定',
+        twelvehour: false,
+        vibrate: true,
+        afterDone: function() {
+            if (this.input && this.input[0]) {
+                this.input[0].dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            validateForm();
+        },
+        afterShow: function() {
+            // 標註非營業時間刻度 (06:00 前與 22:00 後稍微淡化)
+            $('.clockpicker-popover:visible .clockpicker-hours .clockpicker-tick').each(function() {
+                const h = parseInt($(this).text(), 10);
+                if (h < 6 || h > 22) {
+                    $(this).addClass('out-of-business');
+                }
+            });
+        }
     };
-    // 讓浮層掛在各自欄位的外層 .form-group，避免跑到底部
-    const startAppendTo = elements.startTime && elements.startTime.parentElement ? elements.startTime.parentElement : document.body;
-    if (startAppendTo && !startAppendTo.style.position) {
-        startAppendTo.style.position = 'relative';
-        startAppendTo.style.overflow = 'visible';
-    }
-    startTimePicker = flatpickr('#startTime', {
-        ...commonOptions,
-        minTime: getMinTimeForSelectedDate(),
-        maxTime: BUSINESS_MAX_TIME,
-        defaultHour: 7,
-        defaultMinute: 0,
-        appendTo: startAppendTo,
-        static: true,
-        positionElement: elements.startTime,
-        onReady: (selectedDates, dateStr, instance) => {
-            ensureScrollableTimePanel(instance, 'startTime');
-        },
-        onOpen: () => {
-            startTimePicker.set('minTime', getMinTimeForSelectedDate());
-            setTimeout(() => tryFocusTimeUnitInInstance(startTimePicker, 'minute'), 0);
-            refreshScrollableTimePanel(startTimePicker, 'startTime');
-        },
-        onChange: validateForm
-    });
-    const endAppendTo = elements.endTime && elements.endTime.parentElement ? elements.endTime.parentElement : document.body;
-    if (endAppendTo && !endAppendTo.style.position) {
-        endAppendTo.style.position = 'relative';
-        endAppendTo.style.overflow = 'visible';
-    }
-    endTimePicker = flatpickr('#endTime', {
-        ...commonOptions,
-        minTime: getMinTimeForSelectedDate(),
-        maxTime: BUSINESS_MAX_TIME,
-        defaultHour: 8,
-        defaultMinute: 0,
-        appendTo: endAppendTo,
-        static: true,
-        positionElement: elements.endTime,
-        onReady: (selectedDates, dateStr, instance) => {
-            ensureScrollableTimePanel(instance, 'endTime');
-        },
-        onOpen: () => {
-            endTimePicker.set('minTime', getMinTimeForSelectedDate());
-            setTimeout(() => tryFocusTimeUnitInInstance(endTimePicker, 'minute'), 0);
-            refreshScrollableTimePanel(endTimePicker, 'endTime');
-        },
-        onChange: validateForm
+
+    $('#startTime').clockpicker({
+        ...clockOptions,
+        'default': '08:00'
     });
 
-    // 聚焦自動開啟時間面板
-    elements.startTime.addEventListener('focus', () => startTimePicker && startTimePicker.open());
-    elements.endTime.addEventListener('focus', () => endTimePicker && endTimePicker.open());
+    $('#endTime').clockpicker({
+        ...clockOptions,
+        'default': '09:00'
+    });
 
+    // 點擊圖示開啟 ClockPicker
+    const startIcon = document.getElementById('startTimeIcon');
+    if (startIcon) {
+        startIcon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            $('#startTime').clockpicker('show');
+        });
+    }
+    const endIcon = document.getElementById('endTimeIcon');
+    if (endIcon) {
+        endIcon.addEventListener('click', (e) => {
+            e.stopPropagation();
+            $('#endTime').clockpicker('show');
+        });
+    }
 }
+
 
 // 初始化日期 Flatpickr（不預設日期，允許輸入）
 function initializeDatePicker() {
@@ -508,176 +476,6 @@ function initializeDatePicker() {
 }
 
 
-// 直接用 instance 內的 calendarContainer 定位聚焦，避免 appendTo 到 body 後查找不到
-function tryFocusTimeUnitInInstance(instance, unit) {
-    const container = instance && instance.calendarContainer;
-    if (!container) return;
-    const selector = unit === 'minute' ? '.numInputWrapper:nth-of-type(2) input' : '.numInputWrapper:nth-of-type(1) input';
-    const target = container.querySelector(selector);
-    if (target) target.focus();
-}
-
-
-// 新增：可滾動的小時/分鐘欄，支援滑鼠滾輪與點選
-function ensureScrollableTimePanel(instance, inputId) {
-    const calendar = instance && instance.calendarContainer;
-    if (!calendar) return;
-    let panel = calendar.querySelector('.scroll-time-panel');
-    if (!panel) {
-        panel = document.createElement('div');
-        panel.className = 'scroll-time-panel';
-        panel.style.display = 'grid';
-        panel.style.gridTemplateColumns = '1fr 1fr';
-        panel.style.gap = '8px';
-        panel.style.marginTop = '8px';
-        panel.style.position = 'relative';
-        panel.style.width = '100%';
-        panel.style.boxSizing = 'border-box';
-        panel.style.zIndex = '10';
-
-        const hourCol = document.createElement('div');
-        const minuteCol = document.createElement('div');
-        hourCol.className = 'scroll-col hours';
-        minuteCol.className = 'scroll-col minutes';
-        [hourCol, minuteCol].forEach(col => {
-            col.style.maxHeight = '160px';
-            col.style.overflowY = 'auto';
-            col.style.border = '1px solid #e2e8f0';
-            col.style.borderRadius = '6px';
-        });
-
-        panel.appendChild(hourCol);
-        panel.appendChild(minuteCol);
-
-        // 優先放在 Flatpickr 的時間區塊之後，避免定位錯亂
-        const timeContainer = calendar.querySelector('.flatpickr-time') || calendar;
-        if (timeContainer && timeContainer.parentNode) {
-            if (timeContainer.nextSibling) {
-                timeContainer.parentNode.insertBefore(panel, timeContainer.nextSibling);
-            } else {
-                timeContainer.parentNode.appendChild(panel);
-            }
-        } else {
-            calendar.appendChild(panel);
-        }
-
-        // 確保容器可顯示溢出內容
-        calendar.style.overflow = 'visible';
-
-        // 點擊/滾動面板不關閉或影響日曆布局
-        panel.addEventListener('mousedown', (e) => e.stopPropagation());
-        panel.addEventListener('wheel', (e) => e.stopPropagation(), { passive: false });
-
-        // 綁定滾輪：同步選取器時間
-        const sync = () => syncFromScrollPanel(instance, inputId);
-        hourCol.addEventListener('click', sync);
-        minuteCol.addEventListener('click', sync);
-        hourCol.addEventListener('wheel', (e) => { e.preventDefault(); hourCol.scrollTop += e.deltaY; }, { passive: false });
-        minuteCol.addEventListener('wheel', (e) => { e.preventDefault(); minuteCol.scrollTop += e.deltaY; }, { passive: false });
-    }
-    buildScrollableTimeItems(panel, instance, inputId);
-}
-
-function buildScrollableTimeItems(panel, instance, inputId) {
-    const hourCol = panel.querySelector('.scroll-col.hours');
-    const minuteCol = panel.querySelector('.scroll-col.minutes');
-    hourCol.innerHTML = '';
-    minuteCol.innerHTML = '';
-    const minTime = getMinTimeForSelectedDate();
-
-    // 小時：06–22
-    for (let h = 6; h <= 22; h++) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.textContent = String(h).padStart(2, '0');
-        styleScrollBtn(btn);
-        // 若今天，且該小時整點仍小於最小允許時間，標為 disabled
-        const disabled = elements.eventDate.value && compareTime(`${btn.textContent}:00`, minTime) < 0;
-        if (disabled) markDisabled(btn);
-        btn.addEventListener('click', () => {
-            const current = getCurrentPanelTime(instance);
-            const minutes = current ? current.split(':')[1] : '00';
-            const val = `${btn.textContent}:${minutes}`;
-            setPickerTime(instance, inputId, val);
-        });
-        hourCol.appendChild(btn);
-    }
-
-    // 分鐘：顯示整個 0–55 每 5 分鐘
-    for (let m = 0; m < 60; m += 5) {
-        const mm = String(m).padStart(2, '0');
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.textContent = mm;
-        styleScrollBtn(btn);
-        const currentHour = getCurrentPanelTime(instance)?.split(':')[0] || '06';
-        const disabled = elements.eventDate.value && compareTime(`${currentHour}:${mm}`, minTime) < 0;
-        if (disabled) markDisabled(btn);
-        btn.addEventListener('click', () => {
-            const hour = getCurrentPanelTime(instance)?.split(':')[0] || '06';
-            const val = `${hour}:${mm}`;
-            setPickerTime(instance, inputId, val);
-        });
-        minuteCol.appendChild(btn);
-    }
-
-    // 初次同步當前時間
-    highlightCurrent(panel, instance);
-}
-
-function styleScrollBtn(btn) {
-    btn.className = 'scroll-time-btn';
-    btn.style.display = 'block';
-    btn.style.width = '100%';
-    btn.style.textAlign = 'center';
-    btn.style.padding = '6px 0';
-    btn.style.border = 'none';
-    btn.style.borderBottom = '1px solid #e2e8f0';
-    btn.style.background = '#fff';
-    btn.style.cursor = 'pointer';
-    btn.style.fontSize = '14px';
-}
-
-function markDisabled(btn) {
-    btn.disabled = true;
-    btn.style.opacity = '0.5';
-    btn.style.cursor = 'not-allowed';
-}
-
-function getCurrentPanelTime(instance) {
-    const v = instance && instance.input && instance.input.value;
-    return v && /^\d{2}:\d{2}$/.test(v) ? v : null;
-}
-
-function setPickerTime(instance, inputId, val) {
-    // 夾在允許範圍（含今日動態最小值）
-    const min = getMinTimeForSelectedDate();
-    const max = BUSINESS_MAX_TIME;
-    const adjusted = compareTime(val, min) < 0 ? min : (compareTime(val, max) > 0 ? max : val);
-    const input = inputId === 'startTime' ? elements.startTime : elements.endTime;
-    input.value = adjusted;
-    instance.setDate(adjusted, true, 'H:i');
-    validateForm();
-}
-
-function syncFromScrollPanel(instance, inputId) {
-    // 點擊後已於 setPickerTime 處理
-    highlightCurrent(instance.calendarContainer.querySelector('.scroll-time-panel'), instance);
-}
-
-function highlightCurrent(panel, instance) {
-    if (!panel) return;
-    const current = getCurrentPanelTime(instance);
-    const [hh, mm] = (current || '').split(':');
-    panel.querySelectorAll('.scroll-time-btn').forEach(btn => {
-        btn.style.background = '#fff';
-        btn.style.color = '#1e293b';
-        if (btn.textContent === hh || btn.textContent === mm) {
-            btn.style.background = '#2563eb';
-            btn.style.color = '#fff';
-        }
-    });
-}
 
 // 格式化日期為 input 格式 (YYYY-MM-DD)
 function formatDateForInput(date) {

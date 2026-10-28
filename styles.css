@@ -290,4 +290,120 @@ input[type="time"]::-webkit-calendar-picker-indicator:hover {
     to {
         transform: rotate(360deg);
     }
-} 
+}
+
+/* 包含圖示的輸入框容器 */
+.input-with-icon {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.input-with-icon .input {
+    padding-right: 2.75rem;
+}
+
+.input-icon {
+    position: absolute;
+    right: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--secondary-color);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: var(--transition);
+}
+
+.input-icon:hover {
+    color: var(--primary-color);
+    background-color: var(--surface);
+}
+
+/* ClockPicker 自訂美化主題 */
+.clockpicker-popover {
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+    font-family: inherit;
+    z-index: 1050;
+    overflow: hidden;
+}
+
+.clockpicker-popover .popover-title {
+    background-color: var(--surface);
+    border-bottom: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 1.5rem;
+    font-weight: 700;
+    padding: 0.75rem 1rem;
+    text-align: center;
+    letter-spacing: 0.05em;
+}
+
+.clockpicker-popover .text-primary {
+    color: var(--primary-color) !important;
+    font-weight: 800;
+}
+
+.clockpicker-popover .popover-content {
+    background-color: var(--background);
+    padding: 1rem;
+}
+
+.clockpicker-plate {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+}
+
+.clockpicker-tick {
+    color: var(--text-primary);
+    font-weight: 500;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.clockpicker-tick:hover,
+.clockpicker-tick.active {
+    background-color: rgba(37, 99, 235, 0.15);
+    color: var(--primary-color);
+}
+
+.clockpicker-tick.out-of-business {
+    opacity: 0.35;
+}
+
+.clockpicker-canvas-bearing,
+.clockpicker-canvas-fg {
+    fill: var(--primary-color);
+}
+
+.clockpicker-canvas-bg {
+    fill: rgba(37, 99, 235, 0.2);
+}
+
+.clockpicker-canvas-bg-trans {
+    fill: rgba(37, 99, 235, 0.25);
+}
+
+.clockpicker-canvas line {
+    stroke: var(--primary-color);
+    stroke-width: 2;
+}
+
+.clockpicker-button {
+    background-color: var(--surface);
+    color: var(--primary-color);
+    font-weight: 600;
+    font-size: 0.95rem;
+    padding: 0.65rem 0;
+    border-top: 1px solid var(--border);
+    transition: var(--transition);
+}
+
+.clockpicker-button:hover {
+    background-color: rgba(37, 99, 235, 0.08);
+    color: var(--primary-hover);
+}
+ 
